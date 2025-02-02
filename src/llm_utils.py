@@ -1,6 +1,7 @@
 import backoff
 from litellm import completion
 import json
+import os
 
 def run_query(llm_model: str, query: str, system_prompt: str, runs: int = 1) -> list[str]:
     """
@@ -16,11 +17,20 @@ def run_query(llm_model: str, query: str, system_prompt: str, runs: int = 1) -> 
         max_time=30    # Maximum total time to try in seconds
     )
     def _make_completion_call(model: str, messages: list):
-        return completion(
-            model=model,
-            messages=messages,
-            temperature=0.7
-        )
+        # Configure model mapping for Gemini
+        if model.startswith("google/"):
+            os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
+            return completion(
+                model=model,  # Model already includes google/ prefix
+                messages=messages,
+                temperature=0.7
+            )
+        else:
+            return completion(
+                model=model,
+                messages=messages,
+                temperature=0.7
+            )
     
     results = []
     messages = [

@@ -27,7 +27,8 @@ def main():
         # Model selection
         model = st.selectbox(
             "Select Model",
-            ["gpt-3.5-turbo", "gpt-4-mini"],
+            ["gpt-3.5-turbo", "gpt-4o-mini", "gemini/gemini-pro", "gemini/gemini-2.0-flash-exp", 
+             "gemini/gemini-2.0-flash-thinking-exp", "gemini/gemini-1.5-flash"],
             help="Choose the LLM model to use"
         )
     
@@ -35,8 +36,8 @@ def main():
         # Number of runs
         runs = st.selectbox(
             "Number of Runs",
-            [3, 10, 25, 100],
-            index=0,  # Default to 3 runs
+            [1, 10, 25, 100],
+            index=0,  # Default to 1 run
             help="How many times to run the query"
         )
     
