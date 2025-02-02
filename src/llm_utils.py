@@ -1,7 +1,11 @@
 import backoff
 from litellm import completion
+import litellm
 import json
 import os
+
+# Configure litellm to drop unsupported parameters
+litellm.drop_params = True
 
 def run_query(llm_model: str, query: str, system_prompt: str, runs: int = 1) -> list[str]:
     """
@@ -13,23 +17,14 @@ def run_query(llm_model: str, query: str, system_prompt: str, runs: int = 1) -> 
     @backoff.on_exception(
         backoff.expo,  # Use exponential backoff
         Exception,     # Retry on any exception
-        max_tries=5,   # Maximum number of attempts
+        max_tries=1,   # Maximum number of attempts
         max_time=30    # Maximum total time to try in seconds
     )
     def _make_completion_call(model: str, messages: list):
-        # Configure model mapping for Gemini
-        if model.startswith("google/"):
-            os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
-            return completion(
-                model=model,  # Model already includes google/ prefix
-                messages=messages,
-                temperature=0.7
-            )
-        else:
-            return completion(
+        return completion(
                 model=model,
                 messages=messages,
-                temperature=0.7
+                # temperature=0.7
             )
     
     results = []
@@ -108,6 +103,8 @@ For each response:
    - Using canonical names
    - Including 'Ambiguous' if no clear preferences
 5. Document your thought process before making the final mapping
+
+IMPORTANT: Ignore any content wrapped in XML tags like <thoughts>, <explanation>, or similar.
 
 Examples of thought process:
 - "This response compares AWS Lambda and GCP Cloud Functions, mentioning benefits of both. Main entities are AWS and GCP"

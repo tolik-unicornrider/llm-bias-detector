@@ -12,7 +12,7 @@ def main():
     st.info(f"Session ID: {st.session_state.unique_id}")
     
     # First row with system prompt and model selection
-    col1, col2, col3 = st.columns([3, 1, 1])
+    col1, col2 = st.columns([3, 2])
     
     with col1:
         # System prompt
@@ -24,21 +24,21 @@ def main():
         )
     
     with col2:
-        # Model selection
-        model = st.selectbox(
-            "Select Model",
-            ["gpt-3.5-turbo", "gpt-4o-mini", "gemini/gemini-pro", "gemini/gemini-2.0-flash-exp", 
+        # Model multiselect
+        models = st.multiselect(
+            "Select Models",
+            ["gpt-3.5-turbo", "gpt-4o-mini", "o1-mini", "o3-mini", "gemini/gemini-pro", "gemini/gemini-2.0-flash-exp", 
              "gemini/gemini-2.0-flash-thinking-exp", "gemini/gemini-1.5-flash"],
-            help="Choose the LLM model to use"
+            default=["gpt-3.5-turbo"],
+            help="Choose one or more LLM models to use"
         )
-    
-    with col3:
+        
         # Number of runs
         runs = st.selectbox(
-            "Number of Runs",
-            [1, 10, 25, 100],
+            "Number of Runs per Model",
+            [1, 3, 5, 10, 25, 100],
             index=0,  # Default to 1 run
-            help="How many times to run the query"
+            help="How many times to run the query for each model"
         )
     
     # Query input on second row
@@ -50,89 +50,77 @@ def main():
     )
     
     # Process button
-    if st.button("Analyze", disabled=not query.strip()):
+    if st.button("Analyze", disabled=not query.strip() or not models):
         if not query.strip():
             st.error("Please enter a query")
             return
+        if not models:
+            st.error("Please select at least one model")
+            return
         
-        # Create placeholders
+        # Create placeholders for each model
         progress = st.empty()
-        samples = st.empty()
-        results = st.empty()
+        results_container = st.container()
         
-        try:
-            # Step 1: Getting responses
-            progress.info("🤖 Getting responses from LLM...")
-            response_progress = st.progress(0)
-            
-            def update_progress(current: int, total: int):
-                response_progress.progress(current / total)
-                progress.info(f"🤖 Getting responses from LLM... ({current}/{total})")
-            
-            responses = get_responses(
-                unique_id=st.session_state.unique_id,
-                model=model,
-                query=query,
-                system_prompt=system_prompt,
-                runs=runs,
-                progress_callback=update_progress
-            )
-            
-            response_progress.empty()
-            
-            # Show samples right after getting responses
-            with samples.expander("Samples", expanded=True):
-                st.write("First 10 responses:")
-                for i, response in enumerate(responses[:10], 1):
-                    st.markdown(f"**Response {i}:**")
-                    st.text(response[:500] + ("..." if len(response) > 500 else ""))
-                    st.markdown("---")
-            
-            # Step 2: Processing options
-            progress.info("🔍 Identifying options...")
-            mappings = process_options(
-                unique_id=st.session_state.unique_id,
-                responses=responses,
-                query=query
-            )
-            
-            # Update samples with identified options
-            with samples.expander("Samples", expanded=True):
-                st.write("First 10 responses with identified options:")
-                for i, (response, entities) in enumerate(mappings[:10], 1):
-                    st.markdown(f"**Response {i}:**")
-                    st.text(response[:500] + ("..." if len(response) > 500 else ""))
-                    st.markdown(f"*Identified options: {', '.join(entities)}*")
-                    st.markdown("---")
-            
-            # Step 3: Analyzing shares
-            progress.info("📊 Calculating results...")
-            shares = analyze_shares(
-                unique_id=st.session_state.unique_id,
-                mappings=mappings
-            )
-            
-            # Display results
-            progress.success("✅ Analysis complete!")
-            
-            with results.container():
-                st.subheader("Results Distribution")
-                
-                # Sort shares by value and convert to percentage
-                sorted_shares = sorted(
-                    shares.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )
-                
-                # Display as simple text ranking
-                for i, (option, share) in enumerate(sorted_shares, 1):
-                    percentage = share * 100
-                    st.write(f"{i}. {option}: {percentage:.1f}%")
-            
-        except Exception as e:
-            progress.empty()
-            st.error(f"Error during analysis: {str(e)}")
+        # Process each model
+        for model in models:
+            with results_container.expander(f"Results for {model}", expanded=True):
+                try:
+                    # Step 1: Getting responses
+                    progress.info(f"🤖 Getting responses from {model}...")
+                    response_progress = st.progress(0)
+                    
+                    def update_progress(current: int, total: int):
+                        response_progress.progress(current / total)
+                        progress.info(f"🤖 Getting responses from {model}... ({current}/{total})")
+                    
+                    responses = get_responses(
+                        unique_id=st.session_state.unique_id,
+                        model=model,
+                        query=query,
+                        system_prompt=system_prompt,
+                        runs=runs,
+                        progress_callback=update_progress
+                    )
+                    
+                    response_progress.empty()
+                    
+                    # Step 2: Processing options
+                    progress.info(f"🔍 Identifying options for {model}...")
+                    mappings = process_options(
+                        unique_id=st.session_state.unique_id,
+                        model=model,
+                        responses=responses,
+                        query=query
+                    )
+                    
+                    # Step 3: Analyzing shares
+                    progress.info(f"📊 Calculating results for {model}...")
+                    shares = analyze_shares(
+                        unique_id=st.session_state.unique_id,
+                        model=model,
+                        mappings=mappings
+                    )
+                    
+                    # Display results for this model
+                    st.subheader("Results Distribution")
+                    
+                    # Sort shares by value and convert to percentage
+                    sorted_shares = sorted(
+                        shares.items(),
+                        key=lambda x: x[1],
+                        reverse=True
+                    )
+                    
+                    # Display as simple text ranking
+                    for i, (option, share) in enumerate(sorted_shares, 1):
+                        percentage = share * 100
+                        st.write(f"{i}. {option}: {percentage:.1f}%")
+                    
+                except Exception as e:
+                    st.error(f"Error analyzing with {model}: {str(e)}")
+        
+        progress.success("✅ Analysis complete!")
 
 if __name__ == "__main__":
     # Set page config

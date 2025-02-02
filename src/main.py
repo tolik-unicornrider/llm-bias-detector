@@ -12,6 +12,12 @@ def ensure_data_dir(unique_id: str) -> Path:
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
+def get_model_filename(base_name: str, model: str) -> str:
+    """Generate filename with model name"""
+    # Clean up model name for filename
+    model_name = model.replace('/', '-').replace('.', '-')
+    return f"{base_name}_{model_name}.json"
+
 def get_responses(
     unique_id: str,
     model: str,
@@ -46,8 +52,10 @@ def get_responses(
     
     # Save results and query to file
     data_dir = ensure_data_dir(unique_id)
-    with open(data_dir / 'responses.json', 'w') as f:
+    responses_file = get_model_filename('responses', model)
+    with open(data_dir / responses_file, 'w') as f:
         json.dump({
+            'model': model,
             'query': query,
             'responses': results
         }, f, indent=2)
@@ -56,6 +64,7 @@ def get_responses(
 
 def process_options(
     unique_id: str,
+    model: str,
     responses: list[str] = None,
     query: str = None
 ) -> list[tuple[str, list[str]]]:
@@ -65,10 +74,11 @@ def process_options(
     Returns: List of (response, entities) tuples
     """
     data_dir = ensure_data_dir(unique_id)
+    responses_file = get_model_filename('responses', model)
     
     # Load responses if not provided
     if responses is None or query is None:
-        with open(data_dir / 'responses.json', 'r') as f:
+        with open(data_dir / responses_file, 'r') as f:
             data = json.load(f)
             responses = data['responses']
             query = data['query']
@@ -82,8 +92,10 @@ def process_options(
         all_options.update(entities)
     
     # Save mappings and options
-    with open(data_dir / 'options.json', 'w') as f:
+    options_file = get_model_filename('options', model)
+    with open(data_dir / options_file, 'w') as f:
         json.dump({
+            'model': model,
             'query': query,
             'options': sorted(list(all_options)),
             'mappings': [(resp, ents) for resp, ents in mappings]
@@ -93,6 +105,7 @@ def process_options(
 
 def analyze_shares(
     unique_id: str,
+    model: str,
     mappings: list[tuple[str, list[str]]] = None
 ) -> dict[str, float]:
     """
@@ -101,10 +114,11 @@ def analyze_shares(
     Returns: Dictionary of option shares
     """
     data_dir = ensure_data_dir(unique_id)
+    options_file = get_model_filename('options', model)
     
     # Load mappings if not provided
     if mappings is None:
-        with open(data_dir / 'options.json', 'r') as f:
+        with open(data_dir / options_file, 'r') as f:
             data = json.load(f)
             mappings = [(resp, ents) for resp, ents in data['mappings']]
     
@@ -112,8 +126,10 @@ def analyze_shares(
     shares = calculate_options_shares(mappings)
     
     # Save analysis results
-    with open(data_dir / 'analysis.json', 'w') as f:
+    analysis_file = get_model_filename('analysis', model)
+    with open(data_dir / analysis_file, 'w') as f:
         json.dump({
+            'model': model,
             'shares': shares
         }, f, indent=2)
     
@@ -132,8 +148,8 @@ def process_query(
     unique_id = str(uuid.uuid4())[:6]  # First 6 chars of UUID
     
     responses = get_responses(unique_id, model, query, system_prompt, runs)
-    mappings = process_options(unique_id, responses, query)
-    shares = analyze_shares(unique_id, mappings)
+    mappings = process_options(unique_id, model, responses, query)
+    shares = analyze_shares(unique_id, model, mappings)
     return unique_id, shares
 
 # Example usage:
